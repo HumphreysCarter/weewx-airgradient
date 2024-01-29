@@ -127,11 +127,11 @@ void loop() {
           pm2hum = pm2hum / targetCount;
 
           // Post to local server
-          String url = LOCAL_SERVER + "/sensors/airgradient:" + getNormalizedMac();
+          String url = LOCAL_SERVER + "/sensors/airgradient/airgradient:" + getNormalizedMac();
           postToServer(url, pm1Value01, pm1Value25,pm1Value10,pm1PCount, pm1temp,pm1hum,pm2Value01, pm2Value25,pm2Value10,pm2PCount, pm2temp,pm2hum);
 
           // Post to Air Gradient server
-          String url = AIRGRADIENT_SERVER + "/sensors/airgradient:" + getNormalizedMac() + "/measures";
+          url = AIRGRADIENT_SERVER + "/sensors/airgradient:" + getNormalizedMac() + "/measures";
           postToServer(url, pm1Value01, pm1Value25,pm1Value10,pm1PCount, pm1temp,pm1hum,pm2Value01, pm2Value25,pm2Value10,pm2PCount, pm2temp,pm2hum);
           
           countPosition=0;
@@ -187,7 +187,7 @@ void sendPing(){
       String payload = "{\"wifi\":" + String(WiFi.RSSI())
     + ", \"boot\":" + loopCount
     + "}";
-    sendPayload(payload);
+    sendPayload(AIRGRADIENT_SERVER, payload);
 }
 
 void postToServer(String url, int pm1Value01, int pm1Value25, int pm1Value10, int pm1PCount, float pm1temp, float pm1hum,int pm2Value01, int pm2Value25, int pm2Value10, int pm2PCount, float pm2temp, float pm2hum) {

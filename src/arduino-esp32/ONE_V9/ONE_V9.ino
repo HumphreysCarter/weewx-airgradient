@@ -85,7 +85,8 @@ byte value;
 // Display bottom right
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
-String APIROOT = "http://10.3.14.112:8080/"; // "http://hw.airgradient.com/";
+String LOCAL_SERVER = "http://10.3.14.112:8080";
+String AIRGRADIENT_SERVER = "http://hw.airgradient.com";
 
 // set to true to switch from Celcius to Fahrenheit
 boolean inF = false;
@@ -110,7 +111,8 @@ const int oledInterval = 5000;
 unsigned long previousOled = 0;
 
 const int sendToServerInterval = 10000;
-unsigned long previoussendToServer = 0;
+unsigned long previoussendToServer_local = 0;
+unsigned long previoussendToServer_remote = 0;
 
 const int tvocInterval = 1000;
 unsigned long previousTVOC = 0;
@@ -216,7 +218,12 @@ void loop() {
   updateCo2();
   updatePm();
   updateTempHum();
-  sendToServer();
+
+  // Send to local server
+  sendToLocalServer();
+
+  // Send to air gradient server
+  sendToAirGradientServer();
 }
 
 void updateTVOC() {
@@ -529,9 +536,9 @@ void updateOLED3() {
   } while (u8g2.nextPage());
 }
 
-void sendToServer() {
-  if (currentMillis - previoussendToServer >= sendToServerInterval) {
-    previoussendToServer += sendToServerInterval;
+void sendToLocalServer() {
+  if (currentMillis - previoussendToServer_local >= sendToServerInterval) {
+    previoussendToServer_local += sendToServerInterval;
     String payload = "{\"wifi\":" + String(WiFi.RSSI()) +
       (Co2 < 0 ? "" : ", \"rco2\":" + String(Co2)) +
       (pm01 < 0 ? "" : ", \"pm01\":" + String(pm01)) +
@@ -547,7 +554,44 @@ void sendToServer() {
 
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println(payload);
-      String POSTURL = APIROOT + "sensors/airgradient:" + String(getNormalizedMac()) + "/measures";
+      String POSTURL = LOCAL_SERVER + "/sensors/airgradient/airgradient:" + String(getNormalizedMac());
+      Serial.println(POSTURL);
+      WiFiClient client;
+      HTTPClient http;
+      http.begin(client, POSTURL);
+      http.addHeader("content-type", "application/json");
+      int httpCode = http.POST(payload);
+      String response = http.getString();
+      Serial.println(httpCode);
+      Serial.println(response);
+      http.end();
+      resetWatchdog();
+      loopCount++;
+    } else {
+      Serial.println("WiFi Disconnected");
+    }
+  }
+}
+
+void sendToAirGradientServer() {
+  if (currentMillis - previoussendToServer_remote >= sendToServerInterval) {
+    previoussendToServer_remote += sendToServerInterval;
+    String payload = "{\"wifi\":" + String(WiFi.RSSI()) +
+      (Co2 < 0 ? "" : ", \"rco2\":" + String(Co2)) +
+      (pm01 < 0 ? "" : ", \"pm01\":" + String(pm01)) +
+      (pm25 < 0 ? "" : ", \"pm02\":" + String(pm25)) +
+      (pm10 < 0 ? "" : ", \"pm10\":" + String(pm10)) +
+//      (pm03PCount < 0 ? "" : ", \"pm003_count\":" + String(pm03PCount)) +
+      (TVOC < 0 ? "" : ", \"tvoc_index\":" + String(TVOC)) +
+      (NOX < 0 ? "" : ", \"nox_index\":" + String(NOX)) +
+      ", \"atmp\":" + String(temp) +
+      (hum < 0 ? "" : ", \"rhum\":" + String(hum)) +
+      ", \"boot\":" + loopCount +
+      "}";
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println(payload);
+      String POSTURL = AIRGRADIENT_SERVER + "/sensors/airgradient:" + String(getNormalizedMac()) + "/measures";
       Serial.println(POSTURL);
       WiFiClient client;
       HTTPClient http;
