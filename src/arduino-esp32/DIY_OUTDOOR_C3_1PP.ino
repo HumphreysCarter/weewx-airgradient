@@ -52,11 +52,10 @@ float pm2hum = 0;
 int countPosition = 0;
 int targetCount = 20;
 
-
-String APIROOT = "http://10.3.14.112:8080"; // "http://hw.airgradient.com/";
+String LOCAL_SERVER = "http://10.3.14.112:8080";
+String AIRGRADIENT_SERVER = "http://hw.airgradient.com";
 
 int loopCount = 0;
-
 
 void IRAM_ATTR isr() {
   debugln("pushed");
@@ -126,8 +125,15 @@ void loop() {
 //        pm2PCount = pm2PCount / targetCount;
           pm2temp = pm2temp / targetCount;
           pm2hum = pm2hum / targetCount;
-          postToServer(pm1Value01, pm1Value25,pm1Value10,pm1PCount, pm1temp,pm1hum,pm2Value01, pm2Value25,pm2Value10,pm2PCount, pm2temp,pm2hum);
 
+          // Post to local server
+          String url = LOCAL_SERVER + "/sensors/airgradient:" + getNormalizedMac();
+          postToServer(url, pm1Value01, pm1Value25,pm1Value10,pm1PCount, pm1temp,pm1hum,pm2Value01, pm2Value25,pm2Value10,pm2PCount, pm2temp,pm2hum);
+
+          // Post to Air Gradient server
+          String url = AIRGRADIENT_SERVER + "/sensors/airgradient:" + getNormalizedMac() + "/measures";
+          postToServer(url, pm1Value01, pm1Value25,pm1Value10,pm1PCount, pm1temp,pm1hum,pm2Value01, pm2Value25,pm2Value10,pm2PCount, pm2temp,pm2hum);
+          
           countPosition=0;
           pm1Value01=0;
           pm1Value25=0;
@@ -184,7 +190,7 @@ void sendPing(){
     sendPayload(payload);
 }
 
-void postToServer(int pm1Value01, int pm1Value25, int pm1Value10, int pm1PCount, float pm1temp, float pm1hum,int pm2Value01, int pm2Value25, int pm2Value10, int pm2PCount, float pm2temp, float pm2hum) {
+void postToServer(String url, int pm1Value01, int pm1Value25, int pm1Value10, int pm1PCount, float pm1temp, float pm1hum,int pm2Value01, int pm2Value25, int pm2Value10, int pm2PCount, float pm2temp, float pm2hum) {
     String payload = "{\"wifi\":" + String(WiFi.RSSI())
     + ", \"pm01\":" + String((pm1Value01+pm2Value01)/2)
     + ", \"pm02\":" + String((pm1Value25+pm2Value25)/2)
@@ -212,13 +218,12 @@ void postToServer(int pm1Value01, int pm1Value25, int pm1Value10, int pm1PCount,
          + "}"
       + "}"
     + "}";
-    sendPayload(payload);
+    sendPayload(url, payload);
 }
 
-void sendPayload(String payload) {
+void sendPayload(String url, String payload) {
       if(WiFi.status()== WL_CONNECTED){
       switchLED(true);
-      String url = APIROOT + "sensors/airgradient:" + getNormalizedMac() + "/measures";
       debugln(url);
       debugln(payload);
       client.setConnectTimeout(5 * 1000);
