@@ -55,6 +55,12 @@ CC BY-SA 4.0 Attribution-ShareAlike 4.0 International License
 
 #include <U8g2lib.h>
 
+#include <ArduinoJson.h>
+
+#include <WiFiUdp.h>
+#include <NTPClient.h>
+
+
 #define DEBUG true
 
 #define I2C_SDA 7
@@ -88,8 +94,15 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 String LOCAL_SERVER = "http://10.3.14.112:8080";
 String AIRGRADIENT_SERVER = "http://hw.airgradient.com";
 
+String SCHEDULE_SERVER = "http://10.3.14.105:5000/get_data";
+
+WiFiUDP ntpUDP;
+
+int UTC_OFFSET = -7;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", UTC_OFFSET * 3600);
+
 // set to true to switch from Celcius to Fahrenheit
-boolean inF = false;
+boolean inF = true;
 
 // PM2.5 in US AQI (default ug/m3)
 boolean inUSAQI = false;
@@ -135,7 +148,7 @@ unsigned long previousTempHum = 0;
 float temp;
 int hum;
 
-int buttonConfig = 3;
+int buttonConfig = 1;
 int lastState = LOW;
 int currentState;
 unsigned long pressedTime = 0;
@@ -207,6 +220,8 @@ void setup() {
       Serial.println(F("WiFi connected!"));
       Serial.println("IP address: ");
       Serial.println(WiFi.localIP());
+
+      timeClient.begin();
     }
   updateOLED2("Warming Up", "Serial Number:", String(getNormalizedMac()));
 }
@@ -326,10 +341,64 @@ void updateOLED() {
     } else {
       ln3 = "C:" + String(temp) + " H:" + String(hum) + "%";
     }
-    //updateOLED2(ln1, ln2, ln3);
+    // Updated OLED screen
     updateOLED3();
+
+    // Get RGB schedule
+    useRGBledBar = getSchedule();
+
+    // Update RGB
     setRGBledCO2color(Co2);
+
   }
+}
+
+bool getSchedule() {
+  if (WiFi.status() == WL_CONNECTED) {
+      HTTPClient http;
+      
+      // Make an HTTP GET request to fetch the schedule
+      http.begin(SCHEDULE_SERVER);
+
+      int httpCode = http.GET();
+
+      if (httpCode == HTTP_CODE_OK) {
+        String response = http.getString();
+        Serial.println("Received schedule: " + response);
+
+        // Parse the received JSON
+        DynamicJsonDocument doc(1024);  // Adjust the size as needed
+        DeserializationError error = deserializeJson(doc, response);
+
+        // Return false if there is an error parsing JSON
+        if (error) {
+          Serial.println("Error parsing JSON");
+          return false;  
+        }
+
+        // Get current time
+        timeClient.update();
+        int currentHour = timeClient.getHours();
+        Serial.println(currentHour);
+
+        // Check if the current hour is in the "hours_on" array
+        JsonArray hoursOn = doc["hours_on"];
+        for (int i = 0; i < hoursOn.size(); i++) {
+          if (currentHour == hoursOn[i].as<int>()) {
+            return true;
+          }
+        }
+
+        return false;  // Return false if the current hour is not in the "hours_on" array
+      } else {
+        Serial.println("Error fetching schedule. HTTP code: " + String(httpCode));
+        return false;  // Return false in case of an error
+      }
+
+      http.end();
+    }
+
+    return false;  // Return false if not connected to WiFi
 }
 
 void inConf() {
@@ -377,7 +446,7 @@ void setConfig() {
   if (buttonConfig == 0) {
     u8g2.setDisplayRotation(U8G2_R0);
     updateOLED2("T:C, PM:ug/m3", "LED Bar: on", "Long Press Saves");
-    inF = false;
+    inF = true;
     inUSAQI = false;
     useRGBledBar = true;
   } else if (buttonConfig == 1) {
@@ -749,6 +818,12 @@ void setRGBledColor(char color) {
       // default is optional
       break;
     }
+  } else {
+      for (int i = 0; i < 11; i++) {
+        pixels.setPixelColor(i, pixels.Color(0, 0, 0));
+        delay(30);
+        pixels.show();
+      }
   }
 }
 
