@@ -157,10 +157,12 @@ if (WiFi.status() == WL_CONNECTED) {
 }
 
 void loop() {
+  switchLED(true);
   currentMillis = millis();
   updateTVOC();
   updateCo2();
   updatePm();
+  switchLED(false);
 
   // Post to local server
   String url = LOCAL_SERVER + "/sensors/airgradient/airgradient:" + getNormalizedMac();
@@ -169,6 +171,9 @@ void loop() {
   // Post to Air Gradient server
   url = AIRGRADIENT_SERVER + "/sensors/airgradient:" + getNormalizedMac() + "/measures";
   sendToServer(url);
+
+  resetWatchdog();
+  loopCount++;
 }
 
 void updateTVOC() {
@@ -275,8 +280,6 @@ void sendToServer(String url) {
       Serial.println(httpCode);
       //Serial.println(response);
       http.end();
-      resetWatchdog();
-      loopCount++;
     } else {
       Serial.println("WiFi Disconnected");
     }
@@ -291,6 +294,14 @@ void countdown(int from) {
     delay(1000);
   }
   debug("\n");
+}
+
+void switchLED(boolean ledON) {
+ if (ledON) {
+     digitalWrite(10, HIGH);
+  } else {
+    digitalWrite(10, LOW);
+  }
 }
 
 void resetWatchdog() {
