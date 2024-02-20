@@ -15,7 +15,7 @@ class AddAirGradientData(StdService):
 
         # Get data from config
         self.api_directory = '/home/pi/air-quality/data/api/'
-        self.stale_minutes = 2
+        self.stale_minutes = 5
         self.outdoor_sensor = '84fce60c06c4'
         self.indoor_sensor = '84fce60e9b6c'
 
@@ -64,6 +64,10 @@ class AddAirGradientData(StdService):
                 event.record['ag_out_atmp'] = self.correct_rhum(self.get_value(data, 'atmp'))
                 event.record['ag_out_rhum'] = self.correct_rhum(self.get_value(data, 'rhum'))
                 event.record['ag_out_wifi'] = self.get_value(data, 'wifi')
+                event.record['ag_out_tvoc'] = self.get_value(data, 'tvoc_index')
+                event.record['ag_out_nox'] = self.get_value(data, 'nox_index')
+                event.record['ag_out_rco2'] = self.get_value(data, 'rco2')
+
 
         # Get data from indoor sensor
         if self.indoor_sensor is not None:
