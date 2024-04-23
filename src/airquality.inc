@@ -70,6 +70,22 @@
         <td class="data">$AQI_US <span style="background-color: $AQI_US_Color">($AQI_US_Category)</span></td>
       </tr>
       <tr>
+        <td class="label">$obs.label.ag_out_pm02_aqi</td>
+        <td class="data">$current.ag_out_pm02_aqi</td>
+      </tr>
+      <tr>
+        <td class="label">$obs.label.ag_out_pm10_aqi</td>
+        <td class="data">$current.ag_out_pm10_aqi</td>
+      </tr>
+      <tr>
+        <td class="label">$obs.label.ag_out_pm02_nowcast</td>
+        <td class="data">$current.ag_out_pm02_nowcast</td>
+      </tr>
+      <tr>
+        <td class="label">$obs.label.ag_out_pm10_nowcast</td>
+        <td class="data">$current.ag_out_pm10_nowcast</td>
+      </tr>
+      <tr>
         <td class="label">$obs.label.ag_out_atmp</td>
         <td class="data">$current.ag_out_atmp</td>
       </tr>

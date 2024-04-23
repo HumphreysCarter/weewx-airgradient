@@ -18,6 +18,10 @@ import locale
 locale.setlocale(locale.LC_ALL, '')
 
 # Set units for AirGradient sensors
+weewx.units.obs_group_dict["ag_out_pm02_aqi"] = "group_count"
+weewx.units.obs_group_dict["ag_out_pm10_aqi"] = "group_count"
+weewx.units.obs_group_dict["ag_out_pm02_nowcast"] = "group_count"
+weewx.units.obs_group_dict["ag_out_pm10_nowcast"] = "group_count"
 weewx.units.obs_group_dict["ag_out_pm01"] = "group_concentration"
 weewx.units.obs_group_dict["ag_out_pm02"] = "group_concentration"
 weewx.units.obs_group_dict["ag_out_pm10"] = "group_concentration"
