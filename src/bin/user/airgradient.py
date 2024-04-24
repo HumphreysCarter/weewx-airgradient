@@ -1,3 +1,4 @@
+import sys
 import json
 import weewx
 import weewx.units
@@ -7,6 +8,14 @@ from datetime import datetime
 
 import logging
 log = logging.getLogger(__name__)
+
+if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 9):
+    raise weewx.UnsupportedFeature(
+        " weewx-airgradient requires Python 3.9 or later, found %s.%s" % (sys.version_info[0], sys.version_info[1]))
+
+if weewx.__version__ < "4":
+    raise weewx.UnsupportedFeature(
+        " weewx-airgradient requires WeeWX 4, found %s" % weewx.__version__)
 
 # Set units for AirGradient variables
 weewx.units.obs_group_dict["ag_out_pm02_aqi"] = "group_count"
