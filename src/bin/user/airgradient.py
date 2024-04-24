@@ -8,6 +8,31 @@ from datetime import datetime
 import logging
 log = logging.getLogger(__name__)
 
+# Set units for AirGradient variables
+weewx.units.obs_group_dict["ag_out_pm02_aqi"] = "group_count"
+weewx.units.obs_group_dict["ag_out_pm10_aqi"] = "group_count"
+weewx.units.obs_group_dict["ag_out_pm02_nowcast"] = "group_count"
+weewx.units.obs_group_dict["ag_out_pm10_nowcast"] = "group_count"
+weewx.units.obs_group_dict["ag_out_pm01"] = "group_concentration"
+weewx.units.obs_group_dict["ag_out_pm02"] = "group_concentration"
+weewx.units.obs_group_dict["ag_out_pm10"] = "group_concentration"
+weewx.units.obs_group_dict["ag_out_atmp"] = "group_temperature"
+weewx.units.obs_group_dict["ag_out_rhum"] = "group_percent"
+weewx.units.obs_group_dict["ag_out_rco2"] = "group_fraction"
+weewx.units.obs_group_dict["ag_out_tvoc"] = "group_concentration"
+weewx.units.obs_group_dict["ag_out_tvoc_index"] = "group_count"
+weewx.units.obs_group_dict["ag_out_nox"] = "group_concentration"
+weewx.units.obs_group_dict["ag_out_nox_index"] = "group_count"
+weewx.units.obs_group_dict["ag_in_rco2"] = "group_fraction"
+weewx.units.obs_group_dict["ag_in_pm01"] = "group_concentration"
+weewx.units.obs_group_dict["ag_in_pm02"] = "group_concentration"
+weewx.units.obs_group_dict["ag_in_pm10"] = "group_concentration"
+weewx.units.obs_group_dict["ag_in_tvoc"] = "group_concentration"
+weewx.units.obs_group_dict["ag_in_tvoc_index"] = "group_count"
+weewx.units.obs_group_dict["ag_in_nox"] = "group_concentration"
+weewx.units.obs_group_dict["ag_in_nox_index"] = "group_count"
+weewx.units.obs_group_dict["ag_in_atmp"] = "group_temperature"
+weewx.units.obs_group_dict["ag_in_rhum"] = "group_percent"
 
 def get_value(data, key, min_value=None, max_value=None):
     try:
