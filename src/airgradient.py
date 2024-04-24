@@ -96,7 +96,7 @@ def calculate_nowcast(pm_measurements):
 
     # Step 6: Multiply each hourly measurement by the weight factor raised to the power of the number of hours ago
     #         the value was measured
-    nowcast_values = [measurement * weight_factor ** i for i, measurement in enumerate(reversed(pm_measurements))]
+    nowcast_values = [measurement * weight_factor ** i for i, measurement in enumerate(pm_measurements)]
 
     # Step 7: Compute the NowCast by summing the products from Step 6 and dividing by the sum of the weight factor
     #         raised to the power of the number of hours ago each value was measured
