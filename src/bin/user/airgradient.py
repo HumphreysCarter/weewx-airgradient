@@ -139,12 +139,12 @@ def calculate_nowcast(pm_measurements):
     return nowcast
 
 
-class AddAirGradientData(StdService):
+class IngestAirGradientData(StdService):
 
     def __init__(self, engine, config_dict):
 
         # Initialize my superclass first:
-        super(AddAirGradientData, self).__init__(engine, config_dict)
+        super(IngestAirGradientData, self).__init__(engine, config_dict)
 
         # Bind to any new archive record events:
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
