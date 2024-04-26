@@ -76,14 +76,6 @@
         <td class="data">$current.ag_out_pm10_nowcast <span style="background-color: $pm10_aqi_color">($pm10_aqi_category)</span></td>
       </tr>
       <tr>
-        <td class="label">$obs.label.ag_out_pm02_aqi</td>
-        <td class="data">$current.ag_out_pm02_aqi</td>
-      </tr>
-      <tr>
-        <td class="label">$obs.label.ag_out_pm10_aqi</td>
-        <td class="data">$current.ag_out_pm10_aqi</td>
-      </tr>
-      <tr>
         <td class="label">$obs.label.ag_out_atmp</td>
         <td class="data">$current.ag_out_atmp</td>
       </tr>
