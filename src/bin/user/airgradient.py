@@ -105,7 +105,7 @@ def pm10_to_aqi(pm10):
 
 def calculate_aqi_range(C, Cl, Ch, Il, Ih):
     aqi = ((Ih - Il) / (Ch - Cl)) * (C - Cl) + Il
-    return round(aqi)
+    return aqi
 
 
 def calculate_nowcast(pm_measurements):
@@ -182,8 +182,8 @@ class IngestAirGradientData(StdService):
         log.debug(f"AirGradient Ingest: 24-hr mean PM10 = {mean24hr_pm10}.")
 
         # Convert PM to AQI
-        pm02_aqi = pm02_to_aqi(mean24hr_pm02)
-        pm10_aqi = pm10_to_aqi(mean24hr_pm02)
+        pm02_aqi = round(pm02_to_aqi(mean24hr_pm02))
+        pm10_aqi = round(pm10_to_aqi(mean24hr_pm02))
 
         log.debug(f"AirGradient Ingest: PM2.5 AQI = {pm02_aqi}.")
         log.debug(f"AirGradient Ingest: PM10 AQI = {pm10_aqi}.")
@@ -211,8 +211,14 @@ class IngestAirGradientData(StdService):
             pm10_hourly_data.append(hourly_avg[1])
 
         # Calculate NowCast AQI from hourly data PM data
-        pm02_nowcast_aqi = pm02_to_aqi(calculate_nowcast(pm02_hourly_data))
-        pm10_nowcast_aqi = pm10_to_aqi(calculate_nowcast(pm10_hourly_data))
+        if len(pm02_hourly_data) >= 3:
+            pm02_nowcast_aqi = pm02_to_aqi(calculate_nowcast(pm02_hourly_data))
+        else:
+            pm02_nowcast_aqi = None
+        if len(pm10_hourly_data) >= 3:
+            pm10_nowcast_aqi = pm10_to_aqi(calculate_nowcast(pm10_hourly_data))
+        else:
+            pm10_nowcast_aqi = None
 
         log.debug(f"AirGradient Ingest: PM2.5 NowCast AQI = {pm02_nowcast_aqi}.")
         log.debug(f"AirGradient Ingest: PM10 NowCast AQI = {pm10_nowcast_aqi}.")
