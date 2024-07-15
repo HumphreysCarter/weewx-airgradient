@@ -258,9 +258,9 @@ class IngestAirGradientData(StdService):
                     event.record['ag_out_rhum'] = get_value(data, 'rhum', 0, 100)
                     event.record['ag_out_wifi'] = get_value(data, 'wifi')
                     event.record['ag_out_tvoc_index'] = get_value(data, 'tvocIndex', 0)
-                    event.record['ag_out_tvoc'] = get_value(data, 'tvoc_raw', 0)
+                    event.record['ag_out_tvoc'] = get_value(data, 'tvocRaw', 0)
                     event.record['ag_out_nox_index'] = get_value(data, 'noxIndex', 0)
-                    event.record['ag_out_nox'] = get_value(data, 'nox_raw', 0)
+                    event.record['ag_out_nox'] = get_value(data, 'noxRaw', 0)
                     event.record['ag_out_rco2'] = get_value(data, 'rco2', 0)
 
                     # Calculate AQI
@@ -283,9 +283,9 @@ class IngestAirGradientData(StdService):
                     event.record['ag_in_pm02'] = get_value(data, 'pm02', 0)
                     event.record['ag_in_pm10'] = get_value(data, 'pm10', 0)
                     event.record['ag_in_tvoc_index'] = get_value(data, 'tvocIndex', 0)
-                    event.record['ag_in_tvoc'] = get_value(data, 'tvoc_raw', 0)
+                    event.record['ag_in_tvoc'] = get_value(data, 'tvocRaw', 0)
                     event.record['ag_in_nox_index'] = get_value(data, 'noxIndex', 0)
-                    event.record['ag_in_nox'] = get_value(data, 'nox_raw', 0)
+                    event.record['ag_in_nox'] = get_value(data, 'noxRaw', 0)
 
                     atmp = get_value(data, 'atmp', -100, 100)
                     if atmp is not None and self.units_temp != 'degree_C':
