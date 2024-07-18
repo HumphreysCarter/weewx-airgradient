@@ -25,23 +25,34 @@ weewx.units.obs_group_dict["ag_out_pm10_nowcast"] = "group_count"
 weewx.units.obs_group_dict["ag_out_pm01"] = "group_concentration"
 weewx.units.obs_group_dict["ag_out_pm02"] = "group_concentration"
 weewx.units.obs_group_dict["ag_out_pm10"] = "group_concentration"
+weewx.units.obs_group_dict["ag_in_pm003count"] = "group_count"
 weewx.units.obs_group_dict["ag_out_atmp"] = "group_temperature"
+weewx.units.obs_group_dict["ag_out_atmp_corrected"] = "group_temperature"
 weewx.units.obs_group_dict["ag_out_rhum"] = "group_percent"
+weewx.units.obs_group_dict["ag_out_rhum_corrected"] = "group_percent"
 weewx.units.obs_group_dict["ag_out_rco2"] = "group_fraction"
 weewx.units.obs_group_dict["ag_out_tvoc"] = "group_concentration"
 weewx.units.obs_group_dict["ag_out_tvoc_index"] = "group_count"
 weewx.units.obs_group_dict["ag_out_nox"] = "group_concentration"
 weewx.units.obs_group_dict["ag_out_nox_index"] = "group_count"
 weewx.units.obs_group_dict["ag_in_rco2"] = "group_fraction"
+weewx.units.obs_group_dict["ag_in_pm02_aqi"] = "group_count"
+weewx.units.obs_group_dict["ag_in_pm10_aqi"] = "group_count"
+weewx.units.obs_group_dict["ag_in_pm02_nowcast"] = "group_count"
+weewx.units.obs_group_dict["ag_in_pm10_nowcast"] = "group_count"
 weewx.units.obs_group_dict["ag_in_pm01"] = "group_concentration"
 weewx.units.obs_group_dict["ag_in_pm02"] = "group_concentration"
 weewx.units.obs_group_dict["ag_in_pm10"] = "group_concentration"
+weewx.units.obs_group_dict["ag_out_pm003count"] = "group_count"
 weewx.units.obs_group_dict["ag_in_tvoc"] = "group_concentration"
 weewx.units.obs_group_dict["ag_in_tvoc_index"] = "group_count"
 weewx.units.obs_group_dict["ag_in_nox"] = "group_concentration"
 weewx.units.obs_group_dict["ag_in_nox_index"] = "group_count"
 weewx.units.obs_group_dict["ag_in_atmp"] = "group_temperature"
+weewx.units.obs_group_dict["ag_in_atmp_corrected"] = "group_temperature"
 weewx.units.obs_group_dict["ag_in_rhum"] = "group_percent"
+weewx.units.obs_group_dict["ag_in_rhum_corrected"] = "group_percent"
+
 
 def get_value(data, key, min_value=None, max_value=None):
     try:
@@ -142,6 +153,11 @@ def calculate_nowcast(pm_measurements):
 class IngestAirGradientData(StdService):
 
     def __init__(self, engine, config_dict):
+        # Get data from config
+        binding = 'wx_binding'
+        self.outdoor_sensor = '10.101.107.101'
+        self.indoor_sensor = '10.101.107.102'
+        self.max_age_seconds = 120
 
         # Initialize my superclass first:
         super(IngestAirGradientData, self).__init__(engine, config_dict)
@@ -158,59 +174,75 @@ class IngestAirGradientData(StdService):
         elif unit_system == 'METRICWX':
             self.units_temp = weewx.units.MetricWXUnits['group_temperature']
 
-        # Get data from config
-        self.outdoor_sensor = '10.101.107.101'
-        self.indoor_sensor = '10.101.107.102'
-        self.max_age_seconds = 120
+        # Start weewx database access
+        self.db_manager = self.engine.db_binder.get_manager(data_binding=binding, initialize=True)
 
-    def calculate_aqi(self, event):
+    def calculate_aqi(self, event, environment_type):
         """
         Calculates the 24-hour AQI from PM2.5 and PM10.
-        """
-        # Start weewx database access
-        db_manager = self.engine.db_binder.get_manager(data_binding='wx_binding', initialize=True)
 
+        :param event: The event containing the record data.
+        :param environment_type: Type of environment (indoor or outdoor).
+        """
         # Get time of record and time 24 hours before the record
         start_ts = event.record['dateTime'] - 86400
         stop_ts = event.record['dateTime']
 
+        if environment_type == 'indoor':
+            query = "SELECT AVG(ag_in_pm02), AVG(ag_in_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % self.db_manager.table_name
+            pm02_field_name = 'ag_in_pm02_aqi'
+            pm10_field_name = 'ag_in_pm10_aqi'
+        elif environment_type == 'outdoor':
+            query = "SELECT AVG(ag_out_pm02), AVG(ag_out_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % self.db_manager.table_name
+            pm02_field_name = 'ag_out_pm02_aqi'
+            pm10_field_name = 'ag_out_pm10_aqi'
+        else:
+            raise ValueError("Invalid environment type. Must be 'indoor' or 'outdoor'.")
+
         # Get the mean PM2.5 and PM10 over the last 24 hours
-        mean24hr_pm02, mean24hr_pm10 = db_manager.getSql(
-            "SELECT AVG(ag_out_pm02), AVG(ag_out_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % db_manager.table_name,
-            (start_ts, stop_ts))
+        mean24hr_pm02, mean24hr_pm10 = self.db_manager.getSql(query, (start_ts, stop_ts))
         log.debug(f"AirGradient Ingest: 24-hr mean PM2.5 = {mean24hr_pm02}.")
         log.debug(f"AirGradient Ingest: 24-hr mean PM10 = {mean24hr_pm10}.")
 
         # Convert PM to AQI
         pm02_aqi = round(pm02_to_aqi(mean24hr_pm02))
-        pm10_aqi = round(pm10_to_aqi(mean24hr_pm02))
+        pm10_aqi = round(pm10_to_aqi(mean24hr_pm10))
 
-        log.debug(f"AirGradient Ingest: PM2.5 AQI = {pm02_aqi}.")
-        log.debug(f"AirGradient Ingest: PM10 AQI = {pm10_aqi}.")
+        log.debug(f"AirGradient Ingest: {environment_type} PM2.5 AQI = {pm02_aqi}.")
+        log.debug(f"AirGradient Ingest: {environment_type} PM10 AQI = {pm10_aqi}.")
 
-        event.record['ag_out_pm02_aqi'] = pm02_aqi
-        event.record['ag_out_pm10_aqi'] = pm10_aqi
+        event.record[pm02_field_name] = pm02_aqi
+        event.record[pm10_field_name] = pm10_aqi
 
-    def calculate_nowcast_aqi(self, event):
+    def calculate_nowcast_aqi(self, event, environment_type):
         """
         Calculates the NowCast AQI for PM2.5 and PM10.
-        """
-        # Start weewx database access
-        db_manager = self.engine.db_binder.get_manager(data_binding='wx_binding', initialize=True)
 
+        :param event: The event containing the record data.
+        :param environment_type: Type of environment (indoor or outdoor).
+        """
         # Get hourly means over the last 12 hours for PM2.5 and PM10
         pm02_hourly_data, pm10_hourly_data = [], []
         for t in range(12):
             start_ts = event.record['dateTime'] - 3600 * t - 3600
             stop_ts = event.record['dateTime'] - 3600 * t
 
-            hourly_avg = db_manager.getSql(
-                "SELECT AVG(ag_out_pm02), AVG(ag_out_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % db_manager.table_name,
-                (start_ts, stop_ts))
+            if environment_type == 'indoor':
+                query = "SELECT AVG(ag_in_pm02), AVG(ag_in_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % self.db_manager.table_name
+                pm02_field_name = 'ag_in_pm02_nowcast'
+                pm10_field_name = 'ag_in_pm10_nowcast'
+            elif environment_type == 'outdoor':
+                query = "SELECT AVG(ag_out_pm02), AVG(ag_out_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % self.db_manager.table_name
+                pm02_field_name = 'ag_out_pm02_nowcast'
+                pm10_field_name = 'ag_out_pm10_nowcast'
+            else:
+                raise ValueError("AirGradient Ingest: Invalid environment type. Must be 'indoor' or 'outdoor'.")
+
+            hourly_avg = self.db_manager.getSql(query, (start_ts, stop_ts))
             pm02_hourly_data.append(hourly_avg[0])
             pm10_hourly_data.append(hourly_avg[1])
 
-        # Calculate NowCast AQI from hourly data PM data
+        # Calculate NowCast AQI from hourly PM data
         if len(pm02_hourly_data) >= 3:
             pm02_nowcast_aqi = pm02_to_aqi(calculate_nowcast(pm02_hourly_data))
         else:
@@ -220,11 +252,11 @@ class IngestAirGradientData(StdService):
         else:
             pm10_nowcast_aqi = None
 
-        log.debug(f"AirGradient Ingest: PM2.5 NowCast AQI = {pm02_nowcast_aqi}.")
-        log.debug(f"AirGradient Ingest: PM10 NowCast AQI = {pm10_nowcast_aqi}.")
+        log.debug(f"AirGradient Ingest: {environment_type} PM2.5 NowCast AQI = {pm02_nowcast_aqi}.")
+        log.debug(f"AirGradient Ingest: {environment_type} PM10 NowCast AQI = {pm10_nowcast_aqi}.")
 
-        event.record['ag_out_pm02_nowcast'] = pm02_nowcast_aqi
-        event.record['ag_out_pm10_nowcast'] = pm10_nowcast_aqi
+        event.record[pm02_field_name] = pm02_nowcast_aqi
+        event.record[pm10_field_name] = pm10_nowcast_aqi
 
     def new_archive_record(self, event):
         # Get datetime of weewx record
@@ -249,13 +281,20 @@ class IngestAirGradientData(StdService):
                     event.record['ag_out_pm01'] = get_value(data, 'pm01', 0)
                     event.record['ag_out_pm02'] = get_value(data, 'pm02', 0)
                     event.record['ag_out_pm10'] = get_value(data, 'pm10', 0)
+                    event.record['ag_out_pm003count'] = get_value(data, 'pm003Count', 0)
+
                     atmp = get_value(data, 'atmp', -100, 100)
+                    atmp_compensated = get_value(data, 'atmpCompensated', -100, 100)
                     if atmp is not None and self.units_temp != 'degree_C':
                         conversion = weewx.units.conversionDict['degree_C'][self.units_temp]
                         event.record['ag_out_atmp'] = conversion(atmp)
+                        event.record['ag_out_atmp_corrected'] = conversion(atmp_compensated)
                     else:
                         event.record['ag_out_atmp'] = atmp
+                        event.record['ag_out_atmp_corrected'] = atmp_compensated
+
                     event.record['ag_out_rhum'] = get_value(data, 'rhum', 0, 100)
+                    event.record['ag_out_rhum_corrected'] = get_value(data, 'rhumCompensated', 0, 100)
                     event.record['ag_out_wifi'] = get_value(data, 'wifi')
                     event.record['ag_out_tvoc_index'] = get_value(data, 'tvocIndex', 0)
                     event.record['ag_out_tvoc'] = get_value(data, 'tvocRaw', 0)
@@ -264,10 +303,10 @@ class IngestAirGradientData(StdService):
                     event.record['ag_out_rco2'] = get_value(data, 'rco2', 0)
 
                     # Calculate AQI
-                    self.calculate_aqi(event)
+                    self.calculate_aqi(event, 'outdoor')
 
                     # Calculate NowCast AQI
-                    self.calculate_nowcast_aqi(event)
+                    self.calculate_nowcast_aqi(event, 'outdoor')
                 else:
                     log.debug(f"AirGradient Ingest: No data found from sensor at {self.outdoor_sensor}")
 
@@ -282,19 +321,31 @@ class IngestAirGradientData(StdService):
                     event.record['ag_in_pm01'] = get_value(data, 'pm01', 0)
                     event.record['ag_in_pm02'] = get_value(data, 'pm02', 0)
                     event.record['ag_in_pm10'] = get_value(data, 'pm10', 0)
+                    event.record['ag_in_pm003count'] = get_value(data, 'pm003Count', 0)
                     event.record['ag_in_tvoc_index'] = get_value(data, 'tvocIndex', 0)
                     event.record['ag_in_tvoc'] = get_value(data, 'tvocRaw', 0)
                     event.record['ag_in_nox_index'] = get_value(data, 'noxIndex', 0)
                     event.record['ag_in_nox'] = get_value(data, 'noxRaw', 0)
 
                     atmp = get_value(data, 'atmp', -100, 100)
+                    atmp_compensated = get_value(data, 'atmpCompensated', -100, 100)
                     if atmp is not None and self.units_temp != 'degree_C':
                         conversion = weewx.units.conversionDict['degree_C'][self.units_temp]
                         event.record['ag_in_atmp'] = conversion(atmp)
+                        event.record['ag_in_atmp_corrected'] = conversion(atmp_compensated)
                     else:
                         event.record['ag_in_atmp'] = atmp
+                        event.record['ag_in_atmp_corrected'] = atmp_compensated
+
                     event.record['ag_in_rhum'] = get_value(data, 'rhum', 0, 100)
+                    event.record['ag_in_rhum_corrected'] = get_value(data, 'rhumCompensated', 0, 100)
                     event.record['ag_in_wifi'] = get_value(data, 'wifi')
+
+                    # Calculate AQI
+                    self.calculate_aqi(event, 'indoor')
+
+                    # Calculate NowCast AQI
+                    self.calculate_nowcast_aqi(event, 'indoor')
 
                 else:
                     log.debug(f"AirGradient Ingest: No data from sensor at {self.indoor_sensor}")

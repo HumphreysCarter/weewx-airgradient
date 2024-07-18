@@ -100,6 +100,10 @@
         <td class="data">$current.ag_out_pm10</td>
       </tr>
       <tr>
+        <td class="label">$obs.label.ag_out_pm003count</td>
+        <td class="data">$current.ag_out_pm003count</td>
+      </tr>
+      <tr>
         <td class="label">$obs.label.ag_out_tvoc</td>
         <td class="data">$current.ag_out_tvoc</td>
       </tr>
@@ -113,7 +117,15 @@
     <strong>Indoor</strong>
   <table>
     <tbody>
-          <tr>
+      <tr>
+        <td class="label">$obs.label.ag_in_pm02_nowcast</td>
+        <td class="data">$current.ag_in_pm02_nowcast <span style="background-color: $pm02_aqi_color">($pm02_aqi_category)</span></td>
+      </tr>
+      <tr>
+        <td class="label">$obs.label.ag_in_pm10_nowcast</td>
+        <td class="data">$current.ag_in_pm10_nowcast <span style="background-color: $pm10_aqi_color">($pm10_aqi_category)</span></td>
+      </tr>
+      <tr>
         <td class="label">$obs.label.ag_in_atmp</td>
         <td class="data">$current.ag_in_atmp</td>
       </tr>
@@ -136,6 +148,10 @@
       <tr>
         <td class="label">$obs.label.ag_in_pm10</td>
         <td class="data">$current.ag_in_pm10</td>
+      </tr>
+      <tr>
+        <td class="label">$obs.label.ag_in_pm003count</td>
+        <td class="data">$current.ag_in_pm003count</td>
       </tr>
       <tr>
         <td class="label">$obs.label.ag_in_tvoc</td>
