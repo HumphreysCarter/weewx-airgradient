@@ -31,14 +31,17 @@ from datetime import datetime
 import logging
 log = logging.getLogger(__name__)
 
+# Check that system python version is >= 3.9
 if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 9):
     raise weewx.UnsupportedFeature(
         " weewx-airgradient requires Python 3.9 or later, found %s.%s" % (sys.version_info[0], sys.version_info[1]))
 
+# Check that weewx version >= 5
 if weewx.__version__ < "5":
     raise weewx.UnsupportedFeature(
         " weewx-airgradient requires WeeWX 5, found %s" % weewx.__version__)
 
+# Create initial database schema, other columns are created on the fly for each sensor.
 schema = [
     ('dateTime', 'INTEGER NOT NULL PRIMARY KEY'),
     ('usUnits', 'INTEGER NOT NULL'),
@@ -67,6 +70,7 @@ def get_sensor_data(sensor_serial):
             return json.load(url)
 
     except urllib.error.URLError as e:
+        log.error(f'AirGradient Ingest: Error getting data from sensor {sensor_serial}. {e}')
         return None
 
 
@@ -222,7 +226,7 @@ class AirGradientDataIngest(StdService):
 
     def save_record_to_database(self, event):
         """
-        Saves AirGradient data to the database
+        Saves AirGradient data to the database.
         """
         # Get datetime of weewx record
         record_dt = datetime.utcfromtimestamp(event.record['dateTime'])
@@ -230,7 +234,6 @@ class AirGradientDataIngest(StdService):
 
         # Get AirGradient data record
         record = self._thread.get_record()
-        log.debug(record)
 
         # Add record to database
         if not record:
@@ -241,7 +244,87 @@ class AirGradientDataIngest(StdService):
             if delta > self.max_age_seconds:
                 log.debug(f'AirGradient Ingest: Skipping record {datetime.fromtimestamp(event.record["dateTime"])} ({event.record["dateTime"]}). Record old.')
             else:
+                # Calculate both AQI and NowCast AQI for each sensor
+                for sensor in self.sensors:
+                    try:
+                        # Calculate AQI
+                        pm02_aqi, pm10aqi = self.calculate_aqi(sensor, record['dateTime'])
+                        record[f'airquality_{sensor}_pm02_aqi'] = pm02_aqi
+                        record[f'airquality_{sensor}_pm10_aqi'] = pm10aqi
+
+                        # Calculate NowCast AQI
+                        pm02_nowcast, pm10_nowcast = self.calculate_nowcast_aqi(event)
+                        record[f'airquality_{sensor}_pm02_nowcast'] = pm02_nowcast
+                        record[f'airquality_{sensor}_pm10_nowcast'] = pm10_nowcast
+
+                    except Exception as e:
+                        log.error(f'AirGradient Ingest: Error calculating AQI for sensor {sensor}. {e}')
+
+                # Add record to database
                 self.database_manager.addRecord(record)
+
+    def calculate_aqi(self, serial_number, timestamp):
+        """
+        Calculates the 24-hour AQI from PM2.5 and PM10.
+        """
+        # Get time of record and time 24 hours before the record
+        start_ts = timestamp - 86400
+        stop_ts = timestamp
+
+        # Create database query
+        pm02_field_name = f'airquality_{serial_number}_pm02'
+        pm10_field_name = f'airquality_{serial_number}_pm02'
+        query = f'SELECT AVG({pm02_field_name}), AVG({pm10_field_name}) FROM {self.database_manager.table_name} WHERE dateTime>? AND dateTime<=?'
+
+        # Get the mean PM2.5 and PM10 over the last 24 hours
+        mean24hr_pm02, mean24hr_pm10 = self.database_manager.getSql(query, (start_ts, stop_ts))
+        log.debug(f'AirGradient Ingest: {serial_number} 24-hr mean PM2.5 = {mean24hr_pm02}.')
+        log.debug(f'AirGradient Ingest: {serial_number} 24-hr mean PM10 = {mean24hr_pm10}.')
+
+        # Convert PM to AQI
+        pm02_aqi = round(pm02_to_aqi(mean24hr_pm02))
+        pm10_aqi = round(pm10_to_aqi(mean24hr_pm10))
+
+        log.debug(f'AirGradient Ingest: {serial_number} PM2.5 AQI = {pm02_aqi}.')
+        log.debug(f'AirGradient Ingest: {serial_number} PM10 AQI = {pm10_aqi}.')
+
+        return pm02_aqi, pm10_aqi
+
+    def calculate_nowcast_aqi(self, serial_number, timestamp):
+        """
+        Calculates the NowCast AQI for PM2.5 and PM10.
+        """
+        # Get hourly means over the last 12 hours for PM2.5 and PM10
+        pm02_hourly_data, pm10_hourly_data = [], []
+        for t in range(12):
+            # Get one hour time range
+            start_ts = timestamp - 3600 * t - 3600
+            stop_ts = timestamp - 3600 * t
+
+            # Create database query
+            pm02_field_name = f'airquality_{serial_number}_pm02'
+            pm10_field_name = f'airquality_{serial_number}_pm02'
+            query = f'SELECT AVG({pm02_field_name}), AVG({pm10_field_name}) FROM {self.database_manager.table_name} WHERE dateTime>? AND dateTime<=?'
+
+            # Get average PM2.5 and PM10 over time range
+            hourly_avg = self.database_manager.getSql(query, (start_ts, stop_ts))
+            pm02_hourly_data.append(hourly_avg[0])
+            pm10_hourly_data.append(hourly_avg[1])
+
+        # Calculate NowCast AQI from hourly PM data
+        if len(pm02_hourly_data) >= 3:
+            pm02_nowcast_aqi = pm02_to_aqi(calculate_nowcast(pm02_hourly_data))
+        else:
+            pm02_nowcast_aqi = None
+        if len(pm10_hourly_data) >= 3:
+            pm10_nowcast_aqi = pm10_to_aqi(calculate_nowcast(pm10_hourly_data))
+        else:
+            pm10_nowcast_aqi = None
+
+        log.debug(f'AirGradient Ingest: {serial_number} PM2.5 NowCast AQI = {pm02_nowcast_aqi}.')
+        log.debug(f'AirGradient Ingest: {serial_number} PM10 NowCast AQI = {pm10_nowcast_aqi}.')
+
+        return pm02_nowcast_aqi, pm10_nowcast_aqi
 
 
 class AirGradientDataThread(threading.Thread):
@@ -273,85 +356,6 @@ class AirGradientDataThread(threading.Thread):
             else:
                 return self._record.copy()
 
-    def calculate_aqi(self, event, environment_type):
-        """
-        Calculates the 24-hour AQI from PM2.5 and PM10.
-
-        :param event: The event containing the record data.
-        :param environment_type: Type of environment (indoor or outdoor).
-        """
-        # Get time of record and time 24 hours before the record
-        start_ts = event.record['dateTime'] - 86400
-        stop_ts = event.record['dateTime']
-
-        if environment_type == 'indoor':
-            query = "SELECT AVG(ag_in_pm02), AVG(ag_in_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % self.db_manager.table_name
-            pm02_field_name = 'ag_in_pm02_aqi'
-            pm10_field_name = 'ag_in_pm10_aqi'
-        elif environment_type == 'outdoor':
-            query = "SELECT AVG(ag_out_pm02), AVG(ag_out_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % self.db_manager.table_name
-            pm02_field_name = 'ag_out_pm02_aqi'
-            pm10_field_name = 'ag_out_pm10_aqi'
-        else:
-            raise ValueError("Invalid environment type. Must be 'indoor' or 'outdoor'.")
-
-        # Get the mean PM2.5 and PM10 over the last 24 hours
-        mean24hr_pm02, mean24hr_pm10 = self.db_manager.getSql(query, (start_ts, stop_ts))
-        log.debug(f"AirGradient Ingest: 24-hr mean PM2.5 = {mean24hr_pm02}.")
-        log.debug(f"AirGradient Ingest: 24-hr mean PM10 = {mean24hr_pm10}.")
-
-        # Convert PM to AQI
-        pm02_aqi = round(pm02_to_aqi(mean24hr_pm02))
-        pm10_aqi = round(pm10_to_aqi(mean24hr_pm10))
-
-        log.debug(f"AirGradient Ingest: {environment_type} PM2.5 AQI = {pm02_aqi}.")
-        log.debug(f"AirGradient Ingest: {environment_type} PM10 AQI = {pm10_aqi}.")
-
-        return pm02_aqi, pm10_aqi
-
-    def calculate_nowcast_aqi(self, event, environment_type):
-        """
-        Calculates the NowCast AQI for PM2.5 and PM10.
-
-        :param event: The event containing the record data.
-        :param environment_type: Type of environment (indoor or outdoor).
-        """
-        # Get hourly means over the last 12 hours for PM2.5 and PM10
-        pm02_hourly_data, pm10_hourly_data = [], []
-        for t in range(12):
-            start_ts = event.record['dateTime'] - 3600 * t - 3600
-            stop_ts = event.record['dateTime'] - 3600 * t
-
-            if environment_type == 'indoor':
-                query = "SELECT AVG(ag_in_pm02), AVG(ag_in_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % self.db_manager.table_name
-                pm02_field_name = 'ag_in_pm02_nowcast'
-                pm10_field_name = 'ag_in_pm10_nowcast'
-            elif environment_type == 'outdoor':
-                query = "SELECT AVG(ag_out_pm02), AVG(ag_out_pm10) FROM %s WHERE dateTime>? AND dateTime<=?" % self.db_manager.table_name
-                pm02_field_name = 'ag_out_pm02_nowcast'
-                pm10_field_name = 'ag_out_pm10_nowcast'
-            else:
-                raise ValueError("AirGradient Ingest: Invalid environment type. Must be 'indoor' or 'outdoor'.")
-
-            hourly_avg = self.db_manager.getSql(query, (start_ts, stop_ts))
-            pm02_hourly_data.append(hourly_avg[0])
-            pm10_hourly_data.append(hourly_avg[1])
-
-        # Calculate NowCast AQI from hourly PM data
-        if len(pm02_hourly_data) >= 3:
-            pm02_nowcast_aqi = pm02_to_aqi(calculate_nowcast(pm02_hourly_data))
-        else:
-            pm02_nowcast_aqi = None
-        if len(pm10_hourly_data) >= 3:
-            pm10_nowcast_aqi = pm10_to_aqi(calculate_nowcast(pm10_hourly_data))
-        else:
-            pm10_nowcast_aqi = None
-
-        log.debug(f"AirGradient Ingest: {environment_type} PM2.5 NowCast AQI = {pm02_nowcast_aqi}.")
-        log.debug(f"AirGradient Ingest: {environment_type} PM10 NowCast AQI = {pm10_nowcast_aqi}.")
-
-        return pm02_nowcast_aqi, pm10_nowcast_aqi
-
     def run(self):
         self.running = True
 
@@ -366,7 +370,7 @@ class AirGradientDataThread(threading.Thread):
 
     def new_archive_record(self):
         """
-        Creates a new archive record of data from each AirGradient sensor
+        Creates a new archive record of data from each AirGradient sensor.
         """
         record = dict()
         record['dateTime'] = int(time.time())
@@ -408,18 +412,6 @@ class AirGradientDataThread(threading.Thread):
                     record[f'airquality_{sensor}_atmp'] = atmp
                     record[f'airquality_{sensor}_atmp_compensated'] = atmp_compensated
 
-                # TODO: Derive AQI and NowCast AQI
-                """
-                # Calculate AQI
-                pm02_aqi, pm10aqi = self.calculate_aqi(event)
-                record[f'airquality_{sensor}_pm02_aqi'] = pm02_aqi
-                record[f'airquality_{sensor}_pm10_aqi'] = pm10aqi
-                
-                # Calculate NowCast AQI
-                pm02_nowcast, pm10_nowcast = self.calculate_nowcast_aqi(event)
-                record[f'airquality_{sensor}_pm02_nowcast'] = pm02_nowcast
-                record[f'airquality_{sensor}_pm10_nowcast'] = pm10_nowcast
-                """
             else:
                 log.debug(f"AirGradient Ingest: No data found from sensor at {sensor}")
 
