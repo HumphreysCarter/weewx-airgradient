@@ -71,7 +71,7 @@ def get_sensor_data(sensor_serial):
             return json.load(url)
 
     except urllib.error.URLError as e:
-        log.error(f'AirGradient Ingest: Error getting data from sensor {sensor_serial}. {e}')
+        log.warning(f'AirGradient Ingest: Error getting data from sensor {sensor_serial}. {e}')
         return None
 
 
@@ -120,31 +120,35 @@ def calculate_nowcast(pm_measurements):
     """
     Methodology: https://usepa.servicenowservices.com/airnow/en/how-is-the-nowcast-algorithm-used-to-report-current-air-quality?id=kb_article_view&sys_id=bb8b65ef1b06bc10028420eae54bcb98&spa=1
     """
-    # Step 1: Select the minimum and maximum PM measurements
-    pm_min = min(pm_measurements)
-    pm_max = max(pm_measurements)
+    try:
+        # Step 1: Select the minimum and maximum PM measurements
+        pm_min = min(pm_measurements)
+        pm_max = max(pm_measurements)
 
-    # Step 2: Subtract the minimum measurement from the maximum measurement to get the range
-    pm_range = pm_max - pm_min
+        # Step 2: Subtract the minimum measurement from the maximum measurement to get the range
+        pm_range = pm_max - pm_min
 
-    # Step 3: Divide the range by the maximum measurement in the 12-hour period to get the scaled rate of change
-    scaled_rate_change = pm_range / pm_max if pm_max != 0 else 0
+        # Step 3: Divide the range by the maximum measurement in the 12-hour period to get the scaled rate of change
+        scaled_rate_change = pm_range / pm_max if pm_max != 0 else 0
 
-    # Step 4: Subtract the scaled rate of change from 1 to get the weight factor
-    weight_factor = 1 - scaled_rate_change
+        # Step 4: Subtract the scaled rate of change from 1 to get the weight factor
+        weight_factor = 1 - scaled_rate_change
 
-    # Step 5: Ensure the weight factor is between 0.5 and 1
-    weight_factor = max(0.5, min(1, weight_factor))
+        # Step 5: Ensure the weight factor is between 0.5 and 1
+        weight_factor = max(0.5, min(1, weight_factor))
 
-    # Step 6: Multiply each hourly measurement by the weight factor raised to the power of the number of hours ago
-    #         the value was measured
-    nowcast_values = [measurement * weight_factor ** i for i, measurement in enumerate(pm_measurements)]
+        # Step 6: Multiply each hourly measurement by the weight factor raised to the power of the number of hours ago
+        #         the value was measured
+        nowcast_values = [measurement * weight_factor ** i for i, measurement in enumerate(pm_measurements)]
 
-    # Step 7: Compute the NowCast by summing the products from Step 6 and dividing by the sum of the weight factor
-    #         raised to the power of the number of hours ago each value was measured
-    nowcast = sum(nowcast_values) / sum(weight_factor ** i for i in range(len(pm_measurements)))
+        # Step 7: Compute the NowCast by summing the products from Step 6 and dividing by the sum of the weight factor
+        #         raised to the power of the number of hours ago each value was measured
+        nowcast = sum(nowcast_values) / sum(weight_factor ** i for i in range(len(pm_measurements)))
 
-    return nowcast
+        return nowcast
+    except Exception as e:
+        log.error(f'AirGradient Ingest: Error calculating NowCast AQI: {e}.')
+        return None
 
 
 class AirGradientDataIngest(StdService):
@@ -157,7 +161,7 @@ class AirGradientDataIngest(StdService):
         self.max_age_seconds = int(user_config['max_age_seconds'])
         self.sensors = user_config['sensors']
 
-        # TODO: This works to create columns based on the initial settings, but not if another is added later
+        # Setup schema and units for database
         for sensor in self.sensors:
             log.debug(f'Setting up database schema and units for sensor {sensor}')
 
@@ -207,6 +211,13 @@ class AirGradientDataIngest(StdService):
         # Create weewx database connection
         self.database_manager = self.engine.db_binder.get_manager(data_binding=binding, initialize=True)
 
+        # Check that all sensors are within the database
+        db_columns = self.database_manager.connection.columnsOf(self.database_manager.table_name)
+        missing_columns = [column for column in schema if column[0] not in db_columns]
+        for column_name, column_type in missing_columns:
+            log.info(f'Adding column {column_name} with type {column_type} to database.')
+            self.database_manager.add_column(column_name, column_type)
+
         # Listen for new archive records from weewx
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.save_record_to_database)
 
@@ -231,19 +242,18 @@ class AirGradientDataIngest(StdService):
         """
         # Get datetime of weewx record
         record_dt = datetime.utcfromtimestamp(event.record['dateTime'])
-        log.debug(f'AirGradient Ingest: {record_dt}')
 
         # Get AirGradient data record
         record = self._thread.get_record()
 
         # Add record to database
         if not record:
-            log.debug('AirGradient Ingest: Skipping record empty')
+            log.info('AirGradient Ingest: Skipping record empty.')
         else:
             # Check if time delta close enough to record. Keeps current data from getting assigned to old data.
             delta = (datetime.utcnow() - record_dt).total_seconds()
             if delta > self.max_age_seconds:
-                log.debug(
+                log.info(
                     f'AirGradient Ingest: Skipping record {datetime.fromtimestamp(event.record["dateTime"])} ({event.record["dateTime"]}). Record old.')
             else:
                 # Add raw sensor data to database
@@ -251,6 +261,7 @@ class AirGradientDataIngest(StdService):
 
                 # Calculate both AQI and NowCast AQI for each sensor and update the record
                 for sensor in self.sensors:
+                    log.info(f"AirGradient Ingest: Calculating AQI and NowCast AQI for sensor {sensor}.")
                     try:
                         # Calculate AQI
                         pm02_aqi, pm10aqi = self.calculate_aqi(sensor, record['dateTime'])
@@ -264,7 +275,7 @@ class AirGradientDataIngest(StdService):
                         self.database_manager.updateValue(record['dateTime'], f'airquality_{sensor}_pm10_nowcast',
                                                           pm10_nowcast)
                     except Exception as e:
-                        log.error(f'AirGradient Ingest: Error calculating AQI for sensor {sensor}. {e}')
+                        log.error(f'AirGradient Ingest: Error calculating AQI for sensor {sensor}. {e}.')
 
     def calculate_aqi(self, serial_number, timestamp):
         """
@@ -285,8 +296,8 @@ class AirGradientDataIngest(StdService):
         log.debug(f'AirGradient Ingest: {serial_number} 24-hr mean PM10 = {mean24hr_pm10}.')
 
         # Convert PM to AQI
-        pm02_aqi = round(pm02_to_aqi(mean24hr_pm02))
-        pm10_aqi = round(pm10_to_aqi(mean24hr_pm10))
+        pm02_aqi = (round(pm02_to_aqi(mean24hr_pm02)) if mean24hr_pm02 is not None else None)
+        pm10_aqi = (round(pm10_to_aqi(mean24hr_pm10)) if mean24hr_pm10 is not None else None)
 
         log.debug(f'AirGradient Ingest: {serial_number} PM2.5 AQI = {pm02_aqi}.')
         log.debug(f'AirGradient Ingest: {serial_number} PM10 AQI = {pm10_aqi}.')
@@ -316,11 +327,13 @@ class AirGradientDataIngest(StdService):
 
         # Calculate NowCast AQI from hourly PM data
         if len(pm02_hourly_data) >= 3:
-            pm02_nowcast_aqi = pm02_to_aqi(calculate_nowcast(pm02_hourly_data))
+            nowcast_pm02 = calculate_nowcast(pm02_hourly_data)
+            pm02_nowcast_aqi = (pm02_to_aqi(nowcast_pm02) if nowcast_pm02 is not None else None)
         else:
             pm02_nowcast_aqi = None
         if len(pm10_hourly_data) >= 3:
-            pm10_nowcast_aqi = pm10_to_aqi(calculate_nowcast(pm10_hourly_data))
+            nowcast_pm10 = calculate_nowcast(pm10_hourly_data)
+            pm10_nowcast_aqi = (pm10_to_aqi(nowcast_pm10) if nowcast_pm10 is not None else None)
         else:
             pm10_nowcast_aqi = None
 
@@ -369,7 +382,7 @@ class AirGradientDataThread(threading.Thread):
                     self._record = record
                 time.sleep(self.polling_interval)
             except Exception as e:
-                log.error(f'AirGradient Ingest: Error generating record. {e}')
+                log.error(f'AirGradient Ingest: Error generating record. {e}.')
 
     def new_archive_record(self):
         """
@@ -388,7 +401,7 @@ class AirGradientDataThread(threading.Thread):
 
             # Create record
             if data is not None:
-                log.debug(f"AirGradient Ingest: Getting data from sensor {sensor}")
+                log.info(f"AirGradient Ingest: Getting data from sensor {sensor}.")
 
                 # Get data from sensor
                 record[f'airquality_{sensor}_pm01'] = get_value(data, 'pm01', 0)
@@ -416,6 +429,6 @@ class AirGradientDataThread(threading.Thread):
                     record[f'airquality_{sensor}_atmp_compensated'] = atmp_compensated
 
             else:
-                log.debug(f"AirGradient Ingest: No data found from sensor at {sensor}")
+                log.warning(f"AirGradient Ingest: No data found from sensor {sensor}.")
 
         return record
