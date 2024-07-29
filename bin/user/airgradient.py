@@ -29,6 +29,7 @@ from weewx.engine import StdService
 from datetime import datetime
 
 import logging
+
 log = logging.getLogger(__name__)
 
 # Check that system python version is >= 3.9
@@ -242,26 +243,28 @@ class AirGradientDataIngest(StdService):
             # Check if time delta close enough to record. Keeps current data from getting assigned to old data.
             delta = (datetime.utcnow() - record_dt).total_seconds()
             if delta > self.max_age_seconds:
-                log.debug(f'AirGradient Ingest: Skipping record {datetime.fromtimestamp(event.record["dateTime"])} ({event.record["dateTime"]}). Record old.')
+                log.debug(
+                    f'AirGradient Ingest: Skipping record {datetime.fromtimestamp(event.record["dateTime"])} ({event.record["dateTime"]}). Record old.')
             else:
-                # Calculate both AQI and NowCast AQI for each sensor
+                # Add raw sensor data to database
+                self.database_manager.addRecord(record)
+
+                # Calculate both AQI and NowCast AQI for each sensor and update the record
                 for sensor in self.sensors:
                     try:
                         # Calculate AQI
                         pm02_aqi, pm10aqi = self.calculate_aqi(sensor, record['dateTime'])
-                        record[f'airquality_{sensor}_pm02_aqi'] = pm02_aqi
-                        record[f'airquality_{sensor}_pm10_aqi'] = pm10aqi
+                        self.database_manager.updateValue(record['dateTime'], f'airquality_{sensor}_pm02_aqi', pm02_aqi)
+                        self.database_manager.updateValue(record['dateTime'], f'airquality_{sensor}_pm10_aqi', pm10aqi)
 
                         # Calculate NowCast AQI
                         pm02_nowcast, pm10_nowcast = self.calculate_nowcast_aqi(sensor, record['dateTime'])
-                        record[f'airquality_{sensor}_pm02_nowcast'] = pm02_nowcast
-                        record[f'airquality_{sensor}_pm10_nowcast'] = pm10_nowcast
-
+                        self.database_manager.updateValue(record['dateTime'], f'airquality_{sensor}_pm02_nowcast',
+                                                          pm02_nowcast)
+                        self.database_manager.updateValue(record['dateTime'], f'airquality_{sensor}_pm10_nowcast',
+                                                          pm10_nowcast)
                     except Exception as e:
                         log.error(f'AirGradient Ingest: Error calculating AQI for sensor {sensor}. {e}')
-
-                # Add record to database
-                self.database_manager.addRecord(record)
 
     def calculate_aqi(self, serial_number, timestamp):
         """
