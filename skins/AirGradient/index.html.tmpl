@@ -1,0 +1,95 @@
+## Copyright 2009-2018 Tom Keffer, Matthew Wall
+## Distributed under terms of GPLv3.  See LICENSE.txt for your rights.
+#errorCatcher Echo
+##
+## Specifying an encoding of UTF-8 is usually safe:
+#encoding UTF-8
+##
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    ## This choice should match the #encoding directive above
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="15" >
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Air Quality - $station.location</title>
+    <link rel="icon" type="image/png" href="favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="airgradient.css"/>
+    <script src="airgradient.js"></script>
+  </head>
+
+  <body onload="setup();">
+    #include "titlebar.inc"
+
+    <div id="contents">
+      <div id="widget_group">
+        #include "airqualityindex.inc"
+        #include "airqualitydata.inc"
+      </div>
+
+      <div id="plot_group">
+        <div id="history_widget" class="widget">
+          <div id="plot_title" class="widget_title">History:&nbsp;&nbsp;
+            <a class="button_selected" id="button_history_day"
+               onclick="choose_history('day')">Past Day</a>
+            <a class="button" id="button_history_week"
+               onclick="choose_history('week')">Past Week</a>
+            <a class="button" id="button_history_month"
+               onclick="choose_history('month')">Past Month</a>
+            <a class="button" id="button_history_year"
+               onclick="choose_history('year')">Past Year</a>
+          </div>
+
+            <div id="history_day" class="plot_container">
+              #for $sensor in $Extras.sensors
+                <h4>$sensor</h4>
+                <img src="day_${sensor}_pm01.png" alt="${obs.label['airquality_' + sensor + '_pm01']}"/>
+                <img src="day_${sensor}_pm02.png" alt="${obs.label['airquality_' + sensor + '_pm02']}"/>
+                <img src="day_${sensor}_pm10.png" alt="${obs.label['airquality_' + sensor + '_pm10']}"/>
+                <img src="day_${sensor}_pm003_count.png" alt="${obs.label['airquality_' + sensor + '_pm003_count']}"/>
+              #end for
+            </div>
+
+          <div id="history_week" class="plot_container" style="display:none">
+              #for $sensor in $Extras.sensors
+                <h4>$sensor</h4>
+                <img src="week_${sensor}_pm01.png" alt="${obs.label['airquality_' + sensor + '_pm01']}"/>
+                <img src="week_${sensor}_pm02.png" alt="${obs.label['airquality_' + sensor + '_pm02']}"/>
+                <img src="week_${sensor}_pm10.png" alt="${obs.label['airquality_' + sensor + '_pm10']}"/>
+                <img src="week_${sensor}_pm003_count.png" alt="${obs.label['airquality_' + sensor + '_pm003_count']}"/>
+              #end for
+
+          </div>
+          <div id="history_month" class="plot_container" style="display:none">
+            #for $sensor in $Extras.sensors
+                <h4>$sensor</h4>
+                <img src="month_${sensor}_pm01.png" alt="${obs.label['airquality_' + sensor + '_pm01']}"/>
+                <img src="month_${sensor}_pm02.png" alt="${obs.label['airquality_' + sensor + '_pm02']}"/>
+                <img src="month_${sensor}_pm10.png" alt="${obs.label['airquality_' + sensor + '_pm10']}"/>
+                <img src="month_${sensor}_pm003_count.png" alt="${obs.label['airquality_' + sensor + '_pm003_count']}"/>
+            #end for
+
+          </div>
+          <div id="history_year" class="plot_container" style="display:none">
+            #for $sensor in $Extras.sensors
+                <h4>$sensor</h4>
+                <img src="year_${sensor}_pm01.png" alt="${obs.label['airquality_' + sensor + '_pm01']}"/>
+                <img src="year_${sensor}_pm02.png" alt="${obs.label['airquality_' + sensor + '_pm02']}"/>
+                <img src="year_${sensor}_pm10.png" alt="${obs.label['airquality_' + sensor + '_pm10']}"/>
+                <img src="year_${sensor}_pm003_count.png" alt="${obs.label['airquality_' + sensor + '_pm003_count']}"/>
+            #end for
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="footnote">
+      This data is managed with <a href="http://weewx.com/">WeeWX</a>, an
+      experimental weather software system written in Python. Air quality data is obtained from AirGradient sensors using <a href="https://github.com/HumphreysCarter/weewx-airgradient">weewx-airgradient</a>.
+    </p>
+
+</body>
+
+</html>
