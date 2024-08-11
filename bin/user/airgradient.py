@@ -38,9 +38,9 @@ if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] 
         " weewx-airgradient requires Python 3.9 or later, found %s.%s" % (sys.version_info[0], sys.version_info[1]))
 
 # Check that weewx version >= 5
-if weewx.__version__ < "5":
+if weewx.__version__ < "4":
     raise weewx.UnsupportedFeature(
-        " weewx-airgradient requires WeeWX 5, found %s" % weewx.__version__)
+        " weewx-airgradient requires WeeWX 4 or later, found %s" % weewx.__version__)
 
 # Create initial database schema, other columns are created on the fly for each sensor.
 schema = [

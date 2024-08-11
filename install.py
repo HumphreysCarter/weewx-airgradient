@@ -48,6 +48,16 @@ class AirGradientInstaller(ExtensionInstaller):
             author_email='carter.humphreys@lake-effect.dev',
             process_services='user.airgradient.AirGradientDataIngest',
             config={
+                'StdReport': {
+                    'AirGradient': {
+                        'skin': 'AirGradient',
+                        'enable': 'true',
+                        'HTML_ROOT': 'airquality',
+                        'extras': {
+                            'sensors': sensors,
+                        }
+                    },
+                },
                 'AirGradient': {
                     'data_binding': 'airgradient_binding',
                     'polling_interval': 60,
@@ -69,5 +79,11 @@ class AirGradientInstaller(ExtensionInstaller):
                     }
                 },
             },
-            files=[('bin/user/', ['bin/user/airgradient.py']), ]
+            files=[
+                ('bin/user/', ['bin/user/airgradient.py']),
+                ('skins/AirGradient', [
+                    'skins/AirGradient/index.html.tmpl',
+                    'skins/AirGradient/skin.conf',
+                ]),
+            ]
         )

@@ -15,9 +15,15 @@ A [WeeWx](https://weewx.com/) extension for ingesting data from AirGradient indo
 
 This extension can be installed with `weectl extension` using the commands below.
 
+weewx v5+
 ```
 $ source ~/weewx-venv/bin/activate
 $ weectl extension install https://github.com/HumphreysCarter/weewx-airgradient/releases/latest/download/weewx-airgradient.zip
+```
+
+weewx v4
+```
+$ weectl extension --install https://github.com/HumphreysCarter/weewx-airgradient/releases/latest/download/weewx-airgradient.zip
 ```
 
 The installation script will prompt you to enter the serial number for each airgradient sensor on your network. Serial numbers should be entered one at a time, pressing enter at the end of each to move to the next prompt. Once all have been entered, type `done` into the prompt to finish the installation.
