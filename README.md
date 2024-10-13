@@ -40,4 +40,4 @@ Additional sensors can be added later via the weewx config but adding the serial
     sensors = serial_no_1, serial_no_2, serial_no_3 ...  
 ```
 
-The extension will then use the mDNS broadcast from the sensor to pull data and ingest into the weewx database. You can verify that the sensor is broadcasting data by going to `http://airgradient_[serial_no].local/measures/current` on the local network.
+The extension will then use the mDNS broadcast of the sensor via the [Local Server API](https://github.com/airgradienthq/arduino/blob/master/docs/local-server.md) to pull data and ingest into the weewx database. You can verify that the sensor is broadcasting data by going to `http://airgradient_[serial_no].local/measures/current` on the local network.
