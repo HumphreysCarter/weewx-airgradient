@@ -8,9 +8,9 @@
 
   <div class="widget_contents">
  
-    #for $sensor in $Extras.sensors
+    #for $sensor, $sensor_name in zip($Extras.sensors, $Extras.display_name)
       <br>
-      <strong>$sensor</strong>
+      <strong>$sensor_name</strong>
       <table>
         <tbody>
           <tr>
