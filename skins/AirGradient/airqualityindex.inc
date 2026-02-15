@@ -81,9 +81,9 @@
   </div>
 
   <div class="widget_contents">
-    #for $sensor in $Extras.sensors
+    #for $sensor, $sensor_name in zip($Extras.sensors, $Extras.display_name)
       <br>
-      <strong>$sensor</strong>
+      <strong>$sensor_name</strong>
 
       <!-- PM2.5 Section -->
       <div id="aqi_bar_24h_pm25_# $sensor" style="margin-top:10px;margin-bottom:0px;">
