@@ -44,8 +44,8 @@
           </div>
 
             <div id="history_day" class="plot_container">
-              #for $sensor in $Extras.sensors
-                <h4>$sensor</h4>
+              #for $sensor, $sensor_name in zip($Extras.sensors, $Extras.display_name)
+                <h4>$sensor_name</h4>
                 <img src="day_${sensor}_pm01.png" alt="${obs.label['airquality_' + sensor + '_pm01']}"/>
                 <img src="day_${sensor}_pm02.png" alt="${obs.label['airquality_' + sensor + '_pm02']}"/>
                 <img src="day_${sensor}_pm10.png" alt="${obs.label['airquality_' + sensor + '_pm10']}"/>
@@ -54,8 +54,8 @@
             </div>
 
           <div id="history_week" class="plot_container" style="display:none">
-              #for $sensor in $Extras.sensors
-                <h4>$sensor</h4>
+              #for $sensor, $sensor_name in zip($Extras.sensors, $Extras.display_name)
+                <h4>$sensor_name</h4>
                 <img src="week_${sensor}_pm01.png" alt="${obs.label['airquality_' + sensor + '_pm01']}"/>
                 <img src="week_${sensor}_pm02.png" alt="${obs.label['airquality_' + sensor + '_pm02']}"/>
                 <img src="week_${sensor}_pm10.png" alt="${obs.label['airquality_' + sensor + '_pm10']}"/>
@@ -64,8 +64,8 @@
 
           </div>
           <div id="history_month" class="plot_container" style="display:none">
-            #for $sensor in $Extras.sensors
-                <h4>$sensor</h4>
+            #for $sensor, $sensor_name in zip($Extras.sensors, $Extras.display_name)
+                <h4>$sensor_name</h4>
                 <img src="month_${sensor}_pm01.png" alt="${obs.label['airquality_' + sensor + '_pm01']}"/>
                 <img src="month_${sensor}_pm02.png" alt="${obs.label['airquality_' + sensor + '_pm02']}"/>
                 <img src="month_${sensor}_pm10.png" alt="${obs.label['airquality_' + sensor + '_pm10']}"/>
@@ -74,8 +74,8 @@
 
           </div>
           <div id="history_year" class="plot_container" style="display:none">
-            #for $sensor in $Extras.sensors
-                <h4>$sensor</h4>
+            #for $sensor, $sensor_name in zip($Extras.sensors, $Extras.display_name)
+                <h4>$sensor_name</h4>
                 <img src="year_${sensor}_pm01.png" alt="${obs.label['airquality_' + sensor + '_pm01']}"/>
                 <img src="year_${sensor}_pm02.png" alt="${obs.label['airquality_' + sensor + '_pm02']}"/>
                 <img src="year_${sensor}_pm10.png" alt="${obs.label['airquality_' + sensor + '_pm10']}"/>
